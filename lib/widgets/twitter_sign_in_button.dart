@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:twitterAPP/screens/home_page.dart';
 import 'package:twitterAPP/utils/authentication.dart';
+import 'package:twitter_login/entity/auth_result.dart';
 
 class TwitterSignInButton extends StatefulWidget {
   @override
@@ -29,13 +30,15 @@ class _TwitterSignInButtonState extends State<TwitterSignInButton> {
                 ),
               ),
               onPressed: () async {
-                UserCredential? userCredential =
-                    await Authentication.signInWithTwitter();
+                AuthResult? authResult =
+                    await Authentication.signInWithTwitter(context: context);
 
-                if (userCredential != null) {
+                if (authResult != null) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
-                      builder: (context) => MainHomeScreen(),
+                      builder: (context) => MainHomeScreen(
+                        authResult: authResult,
+                      ),
                     ),
                   );
                 }

@@ -3,6 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:twitterAPP/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:twitterAPP/screens/home_page.dart';
+import 'package:twitter_login/entity/auth_result.dart';
+import 'package:twitter_login/schemes/access_token.dart';
 import 'package:twitter_login/twitter_login.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -21,21 +23,16 @@ class Authentication {
     required BuildContext context,
   }) async {
     FirebaseApp firebaseApp = await Firebase.initializeApp();
-
     User? user = FirebaseAuth.instance.currentUser;
 
-    if (user != null) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => MainHomeScreen(),
-        ),
-      );
-    }
+    signInWithTwitter(context: context);
 
     return firebaseApp;
   }
 
-  static Future<UserCredential> signInWithTwitter() async {
+  static Future<AuthResult?> signInWithTwitter(
+      {required BuildContext context}) async {
+    AuthResult? userTwitAccount;
     // Create a TwitterLogin instance
     final twitterLogin = new TwitterLogin(
         apiKey: 'r87tVVHxtaMMbwIHUGPOwN3ny',
@@ -51,8 +48,37 @@ class Authentication {
       secret: authResult.authTokenSecret!,
     );
 
-    // Once signed in, return the UserCredential
-    return await FirebaseAuth.instance
-        .signInWithCredential(twitterAuthCredential);
+    try {
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(twitterAuthCredential);
+      userTwitAccount = authResult;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => MainHomeScreen(
+            authResult: authResult,
+          ),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'account-exists-with-different-credential') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          Authentication.customSnackBar(
+            content: 'The account already exists with a different credential',
+          ),
+        );
+      } else if (e.code == 'invalid-credential') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          Authentication.customSnackBar(
+            content: 'Error occurred while accessing credentials. Try again.',
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        Authentication.customSnackBar(
+          content: 'Error occurred using Google Sign In. Try again.',
+        ),
+      );
+    }
   }
 }
