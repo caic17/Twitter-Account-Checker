@@ -24,8 +24,9 @@ class Authentication {
   }) async {
     FirebaseApp firebaseApp = await Firebase.initializeApp();
     User? user = FirebaseAuth.instance.currentUser;
-
-    signInWithTwitter(context: context);
+    if (user != null) {
+      signInWithTwitter(context: context);
+    }
 
     return firebaseApp;
   }
@@ -52,10 +53,12 @@ class Authentication {
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithCredential(twitterAuthCredential);
       userTwitAccount = authResult;
+      String? fireUid = FirebaseAuth.instance.currentUser?.uid;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => MainHomeScreen(
             authResult: authResult,
+            fireUid: fireUid,
           ),
         ),
       );

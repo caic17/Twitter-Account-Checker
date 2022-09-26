@@ -1,5 +1,4 @@
 import 'dart:ffi';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
@@ -11,18 +10,26 @@ import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:twitterAPP/data/user_db.dart' as user_db;
 import 'package:twitter_login/entity/auth_result.dart';
+// database stuff
+import 'package:twitterAPP/data/account_info.dart';
+import 'package:twitterAPP/data/user_db.dart';
+import 'package:twitterAPP/data/users.dart';
 
 class MainHomeScreen extends StatefulWidget {
-  const MainHomeScreen({required AuthResult authResult})
-      : _authResult = authResult;
+  const MainHomeScreen({String? fireUid, required AuthResult authResult})
+      : _authResult = authResult,
+        _fireUid = fireUid;
 
   final AuthResult _authResult;
+  final String? _fireUid;
+
   @override
   _MainHomeScreenState createState() => _MainHomeScreenState();
 }
 
 class _MainHomeScreenState extends State<MainHomeScreen> {
   late AuthResult _authResult;
+  late String _fireUid;
 
   Route _routeToSignInScreen() {
     return PageRouteBuilder(
@@ -172,15 +179,43 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
     }
   }
 
-  Future testPrint() async {
-    print(_authResult.user!.id);
-    print(_authResult.user!.screenName);
-    print(await testBotometer());
-    print("yay");
+  Future initializeFirestore(
+      String id_str, String screenName, String botScore) async {
+    final CollectionReference recipeCollection =
+        FirebaseFirestore.instance.collection("account_info");
+    recipeCollection.doc(FirebaseAuth.instance.currentUser!.uid).set({
+      'id_str': _authResult.user!.id.toString(),
+      'screen_name': _authResult.user!.screenName
+    });
+
+    recipeCollection
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .collection('following_ids')
+        .add({
+      "id_str": id_str,
+      "screenName": screenName,
+      "botScore": botScore,
+    });
+  }
+
+  Future runSystem() async {
+    // Debug cases:
+    String id_str = "01234567890";
+    String screenName = "BU ENG Stud";
+    //String botScore = "3.2";
+    // Runs Twitter API "GET followers/ids" on _authResult.user!.screenName and _authResult.user!.id_str
+    // get a list of following ids and screenName, for each item do the following
+    // fetch RAPID API AND GET BOT SCORE
+    Map allstuff = await testBotometer();
+    double botscore = allstuff['cap']['universal'];
+    //print(botscore);
+    // save the Twitter ID, twitter @ScreenName and BotScore into FireStore and will display as list
+    initializeFirestore(id_str, screenName, botscore.toString());
   }
 
   @override
   Widget build(BuildContext context) {
+    _fireUid = "TFoYzXh53iONvzBqrLp9eKJIz343";
     return Scaffold(
       backgroundColor: Color.fromARGB(255, 186, 242, 248),
       appBar: AppBar(
@@ -210,7 +245,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               ),
               SizedBox(height: 8.0),
               Text(
-                '\nClick button to generate list of your following accounts.\nAccount info and Bot-like score will be printed',
+                '\nClick button to generate list of your following accounts.\nAccount info and Bot-like score will be printed\nThe lower the score, the more unlikely it is a bot account',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black,
@@ -225,7 +260,7 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                     borderRadius: BorderRadius.circular(10),
                   )),
                 ),
-                onPressed: () => testPrint(),
+                onPressed: () => runSystem(),
                 //onPressed: () => fetchAPI(),
                 child: Padding(
                   padding: EdgeInsets.only(top: 8.0, bottom: 8.0),
@@ -243,16 +278,15 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
               SizedBox(height: 8.0),
               StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
-                      .collection("users")
-                      .doc('_user.uid')
-                      .collection('account_info')
+                      .collection("account_info")
+                      .doc("TFoYzXh53iONvzBqrLp9eKJIz343")
+                      .collection('following_ids')
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.data == null) {
-                      return Container(
-                        child: Text("Loading"),
-                      );
+                    if (snapshot.hasError) {
+                      return const Text('DB cannot be reached');
                     } else {
+                      //print(snapshot.data!.docs.length);
                       return Expanded(
                           child: ListView.builder(
                               scrollDirection: Axis.vertical,
@@ -262,9 +296,9 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                                 return ListTile(
                                     title: buildCard(
                                   context,
-                                  snapshot.data!.docs[index][''],
-                                  snapshot.data!.docs[index][''],
-                                  snapshot.data!.docs[index][''],
+                                  snapshot.data!.docs[index]['id_str'],
+                                  snapshot.data!.docs[index]['screenName'],
+                                  snapshot.data!.docs[index]['botScore'],
                                 ));
                               }));
                     }
@@ -285,7 +319,7 @@ Widget buildCard(
 ) {
   return GestureDetector(
     child: Card(
-      color: Color.fromARGB(255, 3, 104, 172),
+      color: Color.fromARGB(255, 148, 246, 255),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
       ),
@@ -296,7 +330,7 @@ Widget buildCard(
         child: Column(
           children: <Widget>[
             AutoSizeText(
-              screenName,
+              '@' + screenName,
               style: TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
@@ -323,7 +357,7 @@ Widget buildCard(
                         ),
                       ),
                       Text(
-                        "@",
+                        "Twitter Tag:",
                         style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
@@ -331,7 +365,7 @@ Widget buildCard(
                         ),
                       ),
                       Text(
-                        "",
+                        "BotoMeterScore: ",
                         style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
@@ -383,22 +417,3 @@ Widget buildCard(
     ),
   );
 }
-
-class BotDetectionData {
-  final String field1;
-  final String field2;
-
-  const BotDetectionData({
-    this.field1 = '',
-    this.field2 = '',
-  });
-
-  factory BotDetectionData.fromJson(Map<String, dynamic> json) =>
-      _$BotDetectionDataFromJson(json);
-}
-
-BotDetectionData _$BotDetectionDataFromJson(Map<String, dynamic> json) =>
-    BotDetectionData(
-      field1: json['cap'] as String? ?? '',
-      field2: json['field2'] as String? ?? '',
-    );
